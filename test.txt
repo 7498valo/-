@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Minecraft Complete</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            touch-action: none;
+        }
+        body {
+            overflow: hidden;
+            background: #000;
+            font-family: 'Courier New', monospace;
+        }
+        #canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        #ui {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 12px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.9);
+            pointer-events: none;
+            z-index: 10;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        #crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+            z-index: 15;
+        }
+        #crosshair::before, #crosshair::after {
+            content: '';
+            position: absolute;
+            background: white;
+            box-shadow: 0 0 2px black;
+        }
+        #crosshair::before {
+            width: 2px;
+            height: 20px;
+            left: 9px;
+            top: 0;
+        }
+        #crosshair::after {
+            width: 20px;
+            height: 2px;
+            left: 0;
+            top: 9px;
+        }
+        #hotbar {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 4px;
+            z-index: 10;
+            background: rgba(0,0,0,0.5);
+            padding: 8px;
+            border-radius: 5px;
+        }
+        .hotbar-slot {
+            width: 50px;
+            height: 50px;
+            border: 2px solid rgba(255,255,255,0.5);
+            background: rgba(139,69,19,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            color: white;
+            cursor: pointer;
+            position: relative;
+            border-radius: 3px;
+        }
+        .hotbar-slot.active {
+            border-color: white;
+            background: rgba(255,255,255,0.3);
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+        .hotbar-slot .count {
+            position: absolute;
+            bottom: 2px;
+            right: 4px;
+            font-size: 10px;
+            text-shadow: 1px 1px 2px black;
+        }
+        #joystick {
+            position: fixed;
+            bottom: 80px;
+            left: 20px;
+            width: 120px;
+            height: 120px;
+            background: rgba(255,255,255,0.15);
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            z-index: 10;
+        }
+        #stick {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: rgba(255,255,255,0.5);
+            border: 2px solid rgba(255,255,255,0.7);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        #controls {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 10;
+        }
+        .btn {
+            background: rgba(100,100,100,0.7);
+            border: 2px solid rgba(255,255,255,0.5);
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            text-align: center;
+            min-width: 80px;
+        }
+        .btn:active {
+            background: rgba(150,150,150,0.9);
+            transform: scale(0.95);
+        }
+        #inventory, #crafting-menu, #furnace-menu, #chest-menu {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(50,50,50,0.95);
+            border: 3px solid rgba(139,69,19,0.8);
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 20;
+            display: none;
+            max-width: 90vw;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        #inventory.show, #crafting-menu.show, #furnace-menu.show, #chest-menu.show {
+            display: block;
+        }
+        .inv-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 60px);
+            gap: 5px;
+            margin-top: 10px;
+        }
+        .inv-slot, .craft-slot {
+            width: 60px;
+            height: 60px;
+            border: 2px solid rgba(255,255,255,0.3);
+            background: rgba(139,69,19,0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            color: white;
+            cursor: pointer;
+            border-radius: 3px;
+            position: relative;
+        }
+        .inv-slot:hover, .craft-slot:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        .inv-title {
+            color: white;
+            font-size: 16px;
+            margin-bottom: 10px;
+            text-align: center;
+            text-shadow: 2px 2px 4px black;
+        }
+        #health-bar, #hunger-bar, #xp-bar {
+            position: fixed;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 2px;
+            z-index: 10;
+        }
+        #hunger-bar {
+            bottom: 70px;
+            left: calc(50% + 150px);
+        }
+        #xp-bar {
+            bottom: 65px;
+            width: 300px;
+            height: 5px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        #xp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #00aa00);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .heart, .hunger {
+            width: 20px;
+            height: 20px;
+            background: red;
+            clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+        }
+        .heart.empty {
+            background: rgba(255,0,0,0.3);
+        }
+        .hunger {
+            background: #d2691e;
+            clip-path: polygon(50% 0%, 80% 30%, 100% 50%, 80% 70%, 50% 100%, 20% 70%, 0% 50%, 20% 30%);
+        }
+        .hunger.empty {
+            background: rgba(210,105,30,0.3);
+        }
+        #chat {
+            position: fixed;
+            bottom: 220px;
+            left: 10px;
+            width: 400px;
+            max-width: 80vw;
+            z-index: 10;
+        }
+        .chat-message {
+            background: rgba(0,0,0,0.5);
+            color: white;
+            padding: 4px 8px;
+            margin: 2px 0;
+            font-size: 12px;
+            border-radius: 3px;
+            animation: fadeOut 5s forwards;
+        }
+        @keyframes fadeOut {
+            0%, 80% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        #minimap {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 150px;
+            height: 150px;
+            background: rgba(0,0,0,0.7);
+            border: 2px solid rgba(255,255,255,0.5);
+            border-radius: 5px;
+            z-index: 10;
+        }
+        #death-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(255,0,0,0.3);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            z-index: 30;
+        }
+        #death-screen.show {
+            display: flex;
+        }
+        #death-screen h1 {
+            color: red;
+            font-size: 48px;
+            text-shadow: 3px 3px 6px black;
+            margin-bottom: 20px;
+        }
+        .craft-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            gap: 5px;
+            margin: 10px;
+        }
+        .menu-section {
+            margin: 15px 0;
+        }
+        #achievements {
+            position: fixed;
+            top: 50px;
+            right: 10px;
+            width: 300px;
+            max-width: 80vw;
+            z-index: 10;
+        }
+        .achievement {
+            background: rgba(139,69,19,0.9);
+            border: 2px solid gold;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            color: white;
+            animation: slideIn 0.5s, fadeOut 3s 2s forwards;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    
+    <div id="crosshair"></div>
+    
+    <div id="ui">
+        <div>FPS: <span id="fps">0</span></div>
+        <div>座標: X:<span id="posX">0</span> Y:<span id="posY">0</span> Z:<span id="posZ">0</span></div>
+        <div>時刻: <span id="time">昼</span> (<span id="timeNum">0</span>)</div>
+        <div>バイオーム: <span id="biome">平原</span></div>
+        <div>レベル: <span id="level">0</span> (XP: <span id="xp">0</span>)</div>
+        <div>難易度: <span id="difficulty">ノーマル</span></div>
+    </div>
+
+    <div id="health-bar"></div>
+    <div id="hunger-bar"></div>
+    <div id="xp-bar"><div id="xp-fill"></div></div>
+
+    <div id="hotbar"></div>
+
+    <div id="joystick">
+        <div id="stick"></div>
+    </div>
+
+    <div id="controls">
+        <button class="btn" id="jumpBtn">ジャンプ</button>
+        <button class="btn" id="flyBtn">飛行</button>
+        <button class="btn" id="invBtn">持ち物</button>
+        <button class="btn" id="craftBtn">クラフト</button>
+        <button class="btn" id="sprintBtn">ダッシュ</button>
+    </div>
+
+    <div id="chat"></div>
+    <div id="achievements"></div>
+    <canvas id="minimap"></canvas>
+
+    <div id="inventory">
+        <div class="inv-title">インベントリ</div>
+        <div class="inv-grid" id="invGrid"></div>
+        <button class="btn" style="margin-top: 20px; width: 100%;" id="closeInv">閉じる</button>
+    </div>
+
+    <div id="crafting-menu">
+        <div class="inv-title">クラフト</div>
+        <div class="menu-section">
+            <div>材料:</div>
+            <div class="craft-grid" id="craftInput"></div>
+        </div>
+        <div class="menu-section">
+            <div>結果:</div>
+            <div class="craft-slot" id="craftOutput"></div>
+            <button class="btn" id="craftBtn2" style="margin-top: 10px;">クラフト</button>
+        </div>
+        <div class="menu-section">
+            <div>レシピ:</div>
+            <div id="recipeList" style="max-height: 200px; overflow-y: auto;"></div>
+        </div>
+        <button class="btn" style="margin-top: 20px; width: 100%;" id="closeCraft">閉じる</button>
+    </div>
+
+    <div id="furnace-menu">
+        <div class="inv-title">かまど</div>
+        <div class="menu-section">
+            <div>精錬:</div>
+            <div class="craft-slot" id="furnaceInput"></div>
+        </div>
+        <div class="menu-section">
+            <div>燃料:</div>
+            <div class="craft-slot" id="furnaceFuel"></div>
+        </div>
+        <div class="menu-section">
+            <div>結果:</div>
+            <div class="craft-slot" id="furnaceOutput"></div>
+        </div>
+        <div style="color: white; margin-top: 10px;">進行: <span id="furnaceProgress">0</span>%</div>
+        <button class="btn" style="margin-top: 20px; width: 100%;" id="closeFurnace">閉じる</button>
+    </div>
+
+    <div id="chest-menu">
+        <div class="inv-title">チェスト</div>
+        <div class="inv-grid" id="chestGrid"></div>
+        <button class="btn" style="margin-top: 20px; width: 100%;" id="closeChest">閉じる</button>
+    </div>
+
+    <div id="death-screen">
+        <h1>死亡しました</h1>
+        <button class="btn" id="respawnBtn" style="font-size: 20px; padding: 20px 40px;">リスポーン</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const gl = canvas.getContext('webgl', { antialias: false, alpha: false });
+        
+        if (!gl) alert('WebGLがサポートされていません');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        const vsSource = `
+            attribute vec3 aPos;
+            attribute vec2 aTexCoord;
+            attribute vec3 aNormal;
+            attribute float aAO;
+            
+            uniform mat4 uView;
+            uniform mat4 uProj;
+            
+            varying vec2 vTexCoord;
+            varying float vLight;
+            varying float vAO;
+            varying float vFog;
+            
+            void main() {
+                vec4 worldPos = vec4(aPos, 1.0);
+                vec4 viewPos = uView * worldPos;
+                gl_Position = uProj * viewPos;
+                
+                vTexCoord = aTexCoord;
+                vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));
+                vLight = max(dot(aNormal, lightDir), 0.3);
+                vAO = aAO;
+                
+                float dist = length(viewPos.xyz);
+                vFog = clamp((dist - 50.0) / 50.0, 0.0, 1.0);
+            }
+        `;
+
+        const fsSource = `
+            precision mediump float;
+            
+            varying vec2 vTexCoord;
+            varying float vLight;
+            varying float vAO;
+            varying float vFog;
+            
+            uniform vec3 uColor;
+            uniform float uTime;
+            uniform vec3 uFogColor;
+            
+            void main() {
+                vec2 tc = fract(vTexCoord * 4.0);
+                float pattern = step(0.05, tc.x) * step(0.05, tc.y) * 
+                               step(tc.x, 0.95) * step(tc.y, 0.95);
+                
+                vec3 baseColor = uColor * (0.8 + pattern * 0.2);
+                vec3 litColor = baseColor * vLight * vAO;
+                vec3 finalColor = mix(litColor, uFogColor, vFog);
+                
+                gl_FragColor = vec4(finalColor, 1.0);
+            }
+        `;
+
+        function compileShader(src, type) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, src);
+            gl.compileShader(shader);
+            return shader;
+        }
+
+        const program = gl.createProgram();
+        gl.attachShader(program, compileShader(vsSource, gl.VERTEX_SHADER));
+        gl.attachShader(program, compileShader(fsSource, gl.FRAGMENT_SHADER));
+        gl.linkProgram(program);
+        gl.useProgram(program);
+
+        const aPos = gl.getAttribLocation(program, 'aPos');
+        const aTexCoord = gl.getAttribLocation(program, 'aTexCoord');
+        const aNormal = gl.getAttribLocation(program, 'aNormal');
+        const aAO = gl.getAttribLocation(program, 'aAO');
+        const uView = gl.getUniformLocation(program, 'uView');
+        const uProj = gl.getUniformLocation(program, 'uProj');
+        const uColor = gl.getUniformLocation(program, 'uColor');
+        const uTime = gl.getUniformLocation(program, 'uTime');
+        const uFogColor = gl.getUniformLocation(program, 'uFogColor');
+
+        const BLOCKS = {
+            AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, WOOD: 4, LEAVES: 5,
+            SAND: 6, WATER: 7, COBBLESTONE: 8, PLANKS: 9, GLASS: 10,
+            COAL_ORE: 11, IRON_ORE: 12, GOLD_ORE: 13, DIAMOND_ORE: 14,
+            BEDROCK: 15, SNOW: 16, ICE: 17, CLAY: 18, GRAVEL: 19,
+            BRICK: 20, TNT: 21, BOOKSHELF: 22, OBSIDIAN: 23,
+            CRAFTING_TABLE: 24, FURNACE: 25, CHEST: 26, DOOR: 27,
+            TORCH: 28, LADDER: 29, WHEAT: 30, CARROT: 31, POTATO: 32,
+            CACTUS: 33, PUMPKIN: 34, MELON: 35, SUGARCANE: 36,
+            REDSTONE_ORE: 37, LAPIS_ORE: 38, EMERALD_ORE: 39,
+            NETHERRACK: 40, SOUL_SAND: 41, GLOWSTONE: 42, NETHER_BRICK: 43,
+            QUARTZ_ORE: 44, END_STONE: 45, PURPUR: 46, CHORUS: 47
+        };
+
+        const BLOCK_COLORS = {
+            [BLOCKS.GRASS]: [0.3, 0.8, 0.3], [BLOCKS.DIRT]: [0.6, 0.4, 0.2],
+            [BLOCKS.STONE]: [0.5, 0.5, 0.5], [BLOCKS.WOOD]: [0.4, 0.3, 0.2],
+            [BLOCKS.LEAVES]: [0.2, 0.6, 0.2], [BLOCKS.SAND]: [0.9, 0.8, 0.5],
+            [BLOCKS.WATER]: [0.2, 0.3, 0.8], [BLOCKS.COBBLESTONE]: [0.4, 0.4, 0.4],
+            [BLOCKS.PLANKS]: [0.7, 0.5, 0.3], [BLOCKS.GLASS]: [0.7, 0.8, 0.9],
+            [BLOCKS.COAL_ORE]: [0.3, 0.3, 0.3], [BLOCKS.IRON_ORE]: [0.6, 0.5, 0.5],
+            [BLOCKS.GOLD_ORE]: [0.8, 0.7, 0.3], [BLOCKS.DIAMOND_ORE]: [0.4, 0.7, 0.8],
+            [BLOCKS.BEDROCK]: [0.2, 0.2, 0.2], [BLOCKS.SNOW]: [0.95, 0.95, 0.98],
+            [BLOCKS.ICE]: [0.7, 0.85, 0.95], [BLOCKS.CLAY]: [0.7, 0.7, 0.75],
+            [BLOCKS.GRAVEL]: [0.55, 0.55, 0.55], [BLOCKS.BRICK]: [0.7, 0.3, 0.2],
+            [BLOCKS.TNT]: [1.0, 0.2, 0.2], [BLOCKS.BOOKSHELF]: [0.5, 0.35, 0.2],
+            [BLOCKS.OBSIDIAN]: [0.15, 0.1, 0.2], [BLOCKS.CRAFTING_TABLE]: [0.6, 0.4, 0.2],
+            [BLOCKS.FURNACE]: [0.35, 0.35, 0.35], [BLOCKS.CHEST]: [0.6, 0.4, 0.2],
+            [BLOCKS.DOOR]: [0.5, 0.35, 0.2], [BLOCKS.TORCH]: [1.0, 0.8, 0.3],
+            [BLOCKS.LADDER]: [0.5, 0.35, 0.2], [BLOCKS.WHEAT]: [0.8, 0.7, 0.3],
+            [BLOCKS.CARROT]: [0.9, 0.5, 0.2], [BLOCKS.POTATO]: [0.8, 0.7, 0.5],
+            [BLOCKS.CACTUS]: [0.3, 0.6, 0.3], [BLOCKS.PUMPKIN]: [0.9, 0.5, 0.2],
+            [BLOCKS.MELON]: [0.5, 0.8, 0.3], [BLOCKS.SUGARCANE]: [0.4, 0.7, 0.4],
+            [BLOCKS.REDSTONE_ORE]: [0.6, 0.2, 0.2], [BLOCKS.LAPIS_ORE]: [0.2, 0.3, 0.7],
+            [BLOCKS.EMERALD_ORE]: [0.2, 0.7, 0.4], [BLOCKS.NETHERRACK]: [0.5, 0.2, 0.2],
+            [BLOCKS.SOUL_SAND]: [0.4, 0.3, 0.25], [BLOCKS.GLOWSTONE]: [0.9, 0.8, 0.5],
+            [BLOCKS.NETHER_BRICK]: [0.3, 0.15, 0.15], [BLOCKS.QUARTZ_ORE]: [0.8, 0.7, 0.7],
+            [BLOCKS.END_STONE]: [0.9, 0.9, 0.7], [BLOCKS.PURPUR]: [0.6, 0.4, 0.6],
+            [BLOCKS.CHORUS]: [0.5, 0.3, 0.5]
+        };
+
+        const BLOCK_NAMES = {
+            [BLOCKS.GRASS]: '草', [BLOCKS.DIRT]: '土', [BLOCKS.STONE]: '石',
+            [BLOCKS.WOOD]: '木材', [BLOCKS.LEAVES]: '葉', [BLOCKS.SAND]: '砂',
+            [BLOCKS.WATER]: '水', [BLOCKS.COBBLESTONE]: '丸石', [BLOCKS.PLANKS]: '板材',
+            [BLOCKS.GLASS]: 'ガラス', [BLOCKS.COAL_ORE]: '石炭鉱石', [BLOCKS.IRON_ORE]: '鉄鉱石',
+            [BLOCKS.GOLD_ORE]: '金鉱石', [BLOCKS.DIAMOND_ORE]: 'ダイヤ鉱石', [BLOCKS.BEDROCK]: '岩盤',
+            [BLOCKS.SNOW]: '雪', [BLOCKS.ICE]: '氷', [BLOCKS.CLAY]: '粘土',
+            [BLOCKS.GRAVEL]: '砂利', [BLOCKS.BRICK]: 'レンガ', [BLOCKS.TNT]: 'TNT',
+            [BLOCKS.BOOKSHELF]: '本棚', [BLOCKS.OBSIDIAN]: '黒曜石',
+            [BLOCKS.CRAFTING_TABLE]: '作業台', [BLOCKS.FURNACE]: 'かまど',
+            [BLOCKS.CHEST]: 'チェスト', [BLOCKS.DOOR]: 'ドア', [BLOCKS.TORCH]: '松明',
+            [BLOCKS.LADDER]: 'はしご', [BLOCKS.WHEAT]: '小麦', [BLOCKS.CARROT]: 'ニンジン',
+            [BLOCKS.POTATO]: 'ジャガイモ', [BLOCKS.CACTUS]: 'サボテン',
+            [BLOCKS.PUMPKIN]: 'カボチャ', [BLOCKS.MELON]: 'スイカ',
+            [BLOCKS.SUGARCANE]: 'サトウキビ', [BLOCKS.REDSTONE_ORE]: 'レッドストーン鉱石',
+            [BLOCKS.LAPIS_ORE]: 'ラピスラズリ鉱石', [BLOCKS.EMERALD_ORE]: 'エメラルド鉱石',
+            [BLOCKS.NETHERRACK]: 'ネザーラック', [BLOCKS.SOUL_SAND]: 'ソウルサンド',
+            [BLOCKS.GLOWSTONE]: 'グロウストーン', [BLOCKS.NETHER_BRICK]: 'ネザーレンガ',
+            [BLOCKS.QUARTZ_ORE]: 'クォーツ鉱石', [BLOCKS.END_STONE]: 'エンドストーン',
+        
